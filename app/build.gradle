@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+android {
+    namespace 'com.example.a0510'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.example.a0510"
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version "3.10"
+        buildPython "C:/Users/zongz/AppData/Local/Programs/Python/Python310/python.exe"
+        pip {
+            install "C:/Users/zongz/AndroidStudioProjects/0510/wheels/numpy-1.23.3-0-cp310-cp310-android_21_arm64_v8a.whl"
+            install "C:/Users/zongz/AndroidStudioProjects/0510/wheels/scikit_learn-1.3.2-0-cp310-cp310-android_21_arm64_v8a.whl"
+            install "C:/Users/zongz/AndroidStudioProjects/0510/wheels/scikit_image-0.18.3-2-cp310-cp310-android_21_arm64_v8a.whl"
+            install "C:/Users/zongz/AndroidStudioProjects/0510/wheels/joblib-1.5.3-py3-none-any.whl"
+            install "opencv-python-headless"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+    implementation 'androidx.activity:activity:1.9.0'
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.22"))
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+
+    def camerax_version = "1.3.4"
+    implementation "androidx.camera:camera-core:${camerax_version}"
+    implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+    implementation "androidx.camera:camera-view:${camerax_version}"
+}

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <LinearLayout
+        android:id="@+id/main"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- ===== 第 8 章：靜態圖片區 ===== -->
+        <Button
+            android:id="@+id/btnLoadResource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Image from res/raw" />
+
+        <Button
+            android:id="@+id/btnPickImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pick Image from Device" />
+
+        <Button
+            android:id="@+id/btnProcessImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Process Image (OpenCV Canny)" />
+
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:text="Status"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Original Image"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imgOriginal"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginBottom="8dp"
+            android:adjustViewBounds="true"
+            android:background="#EEEEEE"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Result Image (After OpenCV)"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imgResult"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:adjustViewBounds="true"
+            android:background="#EEEEEE"
+            android:scaleType="fitCenter" />
+
+        <!-- ===== 第 9 章：CameraX 區 ===== -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:background="#AAAAAA" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Camera (CameraX)"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginBottom="4dp"/>
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:background="#000000" />
+
+        <Button
+            android:id="@+id/btnCapture"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Capture &amp; Process"
+            android:enabled="false" />
+
+        <Button
+            android:id="@+id/btnToggleMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Switch to RPS Mode" />
+
+        <TextView
+            android:id="@+id/txtCameraStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Camera: Initializing..."
+            android:gravity="center"
+            android:padding="4dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Camera Result (After OpenCV)"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp"/>
+
+        <ImageView
+            android:id="@+id/imgCameraResult"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:adjustViewBounds="true"
+            android:background="#222222"
+            android:scaleType="fitCenter" />
+
+    </LinearLayout>
+</ScrollView>

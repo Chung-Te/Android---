@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">0510</string>
+    <string name="status_default">Status</string>
+    <string name="status_processing">Processing…</string>
+    <string name="status_done">Done! Canny edge detection complete.</string>
+    <string name="status_no_image">Please load or pick an image first.</string>
+    <string name="status_no_selected">No image selected</string>
+    <string name="status_opening_picker">Opening image picker…</string>
+    <string name="status_raw_loaded">Loaded from res/raw: %1$d bytes</string>
+    <string name="status_loaded_bytes">Image loaded: %1$d bytes</string>
+    <string name="status_load_failed">Load failed: %1$s</string>
+    <string name="status_read_failed">Read image failed: %1$s</string>
+    <string name="status_python_error">Python error: %1$s</string>
+</resources>
