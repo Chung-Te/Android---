@@ -36,6 +36,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import ai.onnxruntime.*;
+import java.nio.FloatBuffer;
+import java.util.List;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -67,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
     // ── 模式切換 ──
     private boolean rpsMode    = false;
     private boolean hogSvmMode = false;
+    private boolean laneMode   = true;  // 預設開啟車道偵測
+    private LaneDetector laneDetector;
 
     // ── 圖片選取器 ──
     private ActivityResultLauncher<String> pickImageLauncher;
@@ -92,6 +98,13 @@ public class MainActivity extends AppCompatActivity {
 
         // 複製模型到 files 目錄
         copyAssetToFiles("rps_hog_svm.pkl");
+        copyAssetToFiles("ufld_lane.onnx");
+        try {
+            laneDetector = new LaneDetector(this);
+            Log.d(TAG, "LaneDetector initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "LaneDetector init failed: " + e.getMessage());
+        }
 
         // 複製完模型後，把路徑傳給 Python
         File modelFile = new File(getFilesDir(), "rps_hog_svm.pkl");
@@ -132,18 +145,22 @@ public class MainActivity extends AppCompatActivity {
 
         // ── 模式切換按鈕 ──
         btnToggleMode.setOnClickListener(v -> {
-            if (!rpsMode && !hogSvmMode) {
-                rpsMode = true; hogSvmMode = false;
+            if (laneMode) {
+                laneMode = false; rpsMode = true; hogSvmMode = false;
                 btnToggleMode.setText("Switch to HoG+SVM");
                 txtCameraStatus.setText("RPS Mode");
             } else if (rpsMode) {
-                rpsMode = false; hogSvmMode = true;
+                laneMode = false; rpsMode = false; hogSvmMode = true;
                 btnToggleMode.setText("Switch to Canny");
                 txtCameraStatus.setText("HoG+SVM Mode");
-            } else {
-                rpsMode = false; hogSvmMode = false;
-                btnToggleMode.setText("Switch to RPS");
+            } else if (hogSvmMode) {
+                laneMode = false; rpsMode = false; hogSvmMode = false;
+                btnToggleMode.setText("Switch to Lane");
                 txtCameraStatus.setText("Canny Mode");
+            } else {
+                laneMode = true; rpsMode = false; hogSvmMode = false;
+                btnToggleMode.setText("Switch to RPS");
+                txtCameraStatus.setText("Lane Detection Mode");
             }
         });
 
@@ -236,7 +253,20 @@ public class MainActivity extends AppCompatActivity {
                         imageProxy.close();
 
                         PyObject module, result;
-                        if (hogSvmMode) {
+                        if (laneMode) {
+                            if (laneDetector == null) {
+                                imageProxy.close();
+                                return;
+                            }
+                            // 前處理：NV21 → float array
+                            float[] inputData = preprocessNV21(nv21, width, height);
+                            // Java ONNX 推論
+                            float[] onnxOutput = laneDetector.run(inputData);
+                            // Python 畫圖
+                            PyObject laneModule = py.getModule("lane_detector");
+                            result = laneModule.callAttr("draw_lanes",
+                                    nv21, width, height, onnxOutput);
+                        } else if (hogSvmMode) {
                             module = py.getModule("hog_svm_detector");
                             result = module.callAttr("detect_hog_svm", nv21, width, height);
                         } else if (rpsMode) {
@@ -249,8 +279,7 @@ public class MainActivity extends AppCompatActivity {
 
                         byte[] outPng = result.toJava(byte[].class);
                         Bitmap bmp = BitmapFactory.decodeByteArray(outPng, 0, outPng.length);
-                        String modeStr = hogSvmMode ? "HoG+SVM" : (rpsMode ? "RPS" : "Canny");
-                        runOnUiThread(() -> {
+                        String modeStr = laneMode ? "Lane" : (hogSvmMode ? "HoG+SVM" : (rpsMode ? "RPS" : "Canny"));                        runOnUiThread(() -> {
                             imgCameraResult.setImageBitmap(bmp);
                             txtCameraStatus.setText(modeStr + " ✓ frame=" + frameCount);
                         });
@@ -362,7 +391,38 @@ public class MainActivity extends AppCompatActivity {
         }
         return nv21;
     }
+    private float[] preprocessNV21(byte[] nv21, int width, int height) {
+        // NV21 → RGB float array [3, 288, 800]
+        int targetW = 800, targetH = 288;
+        // 先轉成 int[] ARGB
+        int[] argb = new int[width * height];
+        android.graphics.YuvImage yuv = new android.graphics.YuvImage(
+                nv21, android.graphics.ImageFormat.NV21, width, height, null);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        yuv.compressToJpeg(new android.graphics.Rect(0, 0, width, height), 90, baos);
+        byte[] jpegBytes = baos.toByteArray();
+        Bitmap bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
+        // 旋轉修正
+        android.graphics.Matrix matrix = new android.graphics.Matrix();
+        matrix.postRotate(90);
+        Bitmap rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
+        Bitmap scaled = Bitmap.createScaledBitmap(bmp, targetW, targetH, true);
+        scaled.getPixels(argb, 0, targetW, 0, 0, targetW, targetH);
 
+        float[] input = new float[3 * targetH * targetW];
+        float[] mean = {0.485f, 0.456f, 0.406f};
+        float[] std  = {0.229f, 0.224f, 0.225f};
+        for (int i = 0; i < targetH * targetW; i++) {
+            int pixel = argb[i];
+            float r = ((pixel >> 16) & 0xFF) / 255.0f;
+            float g = ((pixel >>  8) & 0xFF) / 255.0f;
+            float b = ((pixel      ) & 0xFF) / 255.0f;
+            input[i]                       = (r - mean[0]) / std[0];
+            input[targetH * targetW + i]   = (g - mean[1]) / std[1];
+            input[2 * targetH * targetW + i] = (b - mean[2]) / std[2];
+        }
+        return input;
+    }
     // ════════════════════════════════════════
     // 共用工具
     // ════════════════════════════════════════
@@ -397,5 +457,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (cameraExecutor != null) cameraExecutor.shutdown();
+        if (laneDetector != null) {
+            try { laneDetector.close(); } catch (Exception e) { }
+        }
     }
 }
