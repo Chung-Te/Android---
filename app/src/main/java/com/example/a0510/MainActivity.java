@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
     // ── ImageAnalysis 節流 ──
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private int frameCount = 0;
-    private static final int PROCESS_EVERY_N_FRAMES = 5;
+    private static final int PROCESS_EVERY_N_FRAMES = 3;
 
     // ── 模式切換 ──
     private boolean rpsMode    = false;
@@ -392,22 +392,30 @@ public class MainActivity extends AppCompatActivity {
         return nv21;
     }
     private float[] preprocessNV21(byte[] nv21, int width, int height) {
-        // NV21 → RGB float array [3, 288, 800]
         int targetW = 800, targetH = 288;
-        // 先轉成 int[] ARGB
-        int[] argb = new int[width * height];
+
+        // 直接用 RenderScript 或 Android YuvImage 轉換
         android.graphics.YuvImage yuv = new android.graphics.YuvImage(
                 nv21, android.graphics.ImageFormat.NV21, width, height, null);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        yuv.compressToJpeg(new android.graphics.Rect(0, 0, width, height), 90, baos);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(width * height);
+        yuv.compressToJpeg(new android.graphics.Rect(0, 0, width, height), 70, baos);
         byte[] jpegBytes = baos.toByteArray();
-        Bitmap bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
-        // 旋轉修正
+
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inPreferredConfig = Bitmap.Config.RGB_565; // 比 ARGB_8888 快
+        Bitmap bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length, opts);
+
         android.graphics.Matrix matrix = new android.graphics.Matrix();
         matrix.postRotate(90);
-        Bitmap rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
-        Bitmap scaled = Bitmap.createScaledBitmap(bmp, targetW, targetH, true);
+        Bitmap rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, false);
+        bmp.recycle();
+
+        Bitmap scaled = Bitmap.createScaledBitmap(rotated, targetW, targetH, false);
+        rotated.recycle();
+
+        int[] argb = new int[targetW * targetH];
         scaled.getPixels(argb, 0, targetW, 0, 0, targetW, targetH);
+        scaled.recycle();
 
         float[] input = new float[3 * targetH * targetW];
         float[] mean = {0.485f, 0.456f, 0.406f};
@@ -417,8 +425,8 @@ public class MainActivity extends AppCompatActivity {
             float r = ((pixel >> 16) & 0xFF) / 255.0f;
             float g = ((pixel >>  8) & 0xFF) / 255.0f;
             float b = ((pixel      ) & 0xFF) / 255.0f;
-            input[i]                       = (r - mean[0]) / std[0];
-            input[targetH * targetW + i]   = (g - mean[1]) / std[1];
+            input[i]                         = (r - mean[0]) / std[0];
+            input[targetH * targetW + i]     = (g - mean[1]) / std[1];
             input[2 * targetH * targetW + i] = (b - mean[2]) / std[2];
         }
         return input;
