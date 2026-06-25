@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
     // ── ImageAnalysis 節流 ──
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private int frameCount = 0;
-    private static final int PROCESS_EVERY_N_FRAMES = 3;
+    private static final int PROCESS_EVERY_N_FRAMES = 2;
 
     // ── 模式切換 ──
     private boolean rpsMode    = false;
@@ -235,7 +235,7 @@ public class MainActivity extends AppCompatActivity {
                         .build();
 
                 ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
-                        .setTargetResolution(new Size(640, 480))
+                        .setTargetResolution(new Size(480, 360))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
 

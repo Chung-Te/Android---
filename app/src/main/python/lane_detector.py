@@ -12,7 +12,7 @@ class LaneTracker:
     def __init__(self):
         self.left_coeffs = None
         self.right_coeffs = None
-        self.alpha = 0.7
+        self.alpha = 0.3
 
     def update(self, lanes):
         if len(lanes) >= 2:
@@ -36,9 +36,9 @@ class LaneTracker:
         lane_center = (left_x + right_x) / 2
         car_center = frame_width / 2
         offset = car_center - lane_center
-        if offset > 50:
+        if offset > 135:
             return offset, "RIGHT"
-        elif offset < -50:
+        elif offset < -135:
             return offset, "LEFT"
         else:
             return offset, "NORMAL"
@@ -80,7 +80,7 @@ def draw_lanes(nv21_bytes, width, height, onnx_output_flat):
         lane_pts = []
         for row_idx in range(len(ROW_ANCHORS)):
             prob = output[:GRIDING_NUM, row_idx, lane_idx]
-            if prob.max() < 0.5:
+            if prob.max() < 0.15:
                 continue
             loc = np.argmax(prob)
             x = int(col_sample[loc] * width / IMG_W)
@@ -89,6 +89,9 @@ def draw_lanes(nv21_bytes, width, height, onnx_output_flat):
         if len(lane_pts) > 2:
             lanes.append(lane_pts)
 
+    # 如果 DL 偵測不到車道線，用傳統 CV 補強
+    if len(lanes) < 2:
+        lanes = _fallback_hough(bgr, width, height)
     # 更新追蹤器
     _tracker.update(lanes)
     offset, status = _tracker.get_center_offset(width, int(height * 0.8))
@@ -126,4 +129,55 @@ def draw_lanes(nv21_bytes, width, height, onnx_output_flat):
                     cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
 
     _, buf = cv2.imencode('.png', vis)
+
     return buf.tobytes()
+
+def _fallback_hough(bgr, width, height):
+    """傳統 CV 霍夫直線補強，當 DL 偵測失敗時使用"""
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+    # ROI：只看下半部
+    roi_top = height // 2
+    roi = gray[roi_top:, :]
+
+    # 高斯模糊 + Canny
+    blur = cv2.GaussianBlur(roi, (5, 5), 0)
+    edges = cv2.Canny(blur, 50, 150)
+
+    # 霍夫直線
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180,
+                            threshold=30,
+                            minLineLength=30,
+                            maxLineGap=20)
+
+    if lines is None:
+        return []
+
+    left_lines, right_lines = [], []
+    cx = width // 2
+
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        if x2 == x1:
+            continue
+        slope = (y2 - y1) / (x2 - x1)
+        # 過濾水平線
+        if abs(slope) < 0.3:
+            continue
+        # 依位置分左右
+        if x1 < cx and x2 < cx:
+            left_lines.append((x1, y1 + roi_top, x2, y2 + roi_top))
+        elif x1 > cx and x2 > cx:
+            right_lines.append((x1, y1 + roi_top, x2, y2 + roi_top))
+
+    lanes = []
+    for lines_group in [left_lines, right_lines]:
+        if len(lines_group) == 0:
+            continue
+        pts = []
+        for x1, y1, x2, y2 in lines_group:
+            pts.append((x1, y1))
+            pts.append((x2, y2))
+        lanes.append(pts)
+
+    return lanes
